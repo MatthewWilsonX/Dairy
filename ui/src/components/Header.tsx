@@ -14,9 +14,6 @@ export function Header() {
               </svg>
             </div>
             <h1 className="header-title">OnChain Diary</h1>
-            <span className="header-badge">
-              FHE Encrypted
-            </span>
           </div>
           <div className="header-right">
             <ConnectButton />

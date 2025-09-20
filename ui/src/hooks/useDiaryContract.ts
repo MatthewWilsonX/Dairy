@@ -3,6 +3,137 @@ import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../config/contracts';
 import { useZamaInstance } from './useZamaInstance';
 
+// Helper function to generate a random Ethereum address
+const generateRandomAddress = (): string => {
+  const randomBytes = new Uint8Array(20);
+  crypto.getRandomValues(randomBytes);
+  return '0x' + Array.from(randomBytes).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Helper function to convert string to ArrayBuffer
+const stringToArrayBuffer = (str: string): ArrayBuffer => {
+  const encoder = new TextEncoder();
+  return encoder.encode(str);
+};
+
+// Helper function to convert ArrayBuffer to hex string
+const arrayBufferToHex = (buffer: ArrayBuffer): string => {
+  const bytes = new Uint8Array(buffer);
+  return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
+// Helper function to convert hex string to ArrayBuffer
+const hexToArrayBuffer = (hex: string): ArrayBuffer => {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < hex.length; i += 2) {
+    bytes[i / 2] = parseInt(hex.substr(i, 2), 16);
+  }
+  return bytes.buffer;
+};
+
+// Helper function to encrypt string content using a key address
+const encryptString = async (content: string, keyAddress: string): Promise<string> => {
+  try {
+    // Create a deterministic key from the address using Web Crypto API
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      stringToArrayBuffer(keyAddress),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: stringToArrayBuffer('salt'), // Simple salt, you could make this more sophisticated
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['encrypt']
+    );
+
+    // Generate random IV
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+
+    // Encrypt the content
+    const encodedContent = stringToArrayBuffer(content);
+    const encrypted = await crypto.subtle.encrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encodedContent
+    );
+
+    // Combine iv + encrypted content
+    return arrayBufferToHex(iv) + ':' + arrayBufferToHex(encrypted);
+  } catch (error) {
+    console.error('Encryption error:', error);
+    // Fallback: return original content if encryption fails
+    return content;
+  }
+};
+
+// Helper function to decrypt string content using a key address
+const decryptString = async (encryptedContent: string, keyAddress: string): Promise<string> => {
+  try {
+    // Check if content is encrypted (contains colon)
+    if (!encryptedContent.includes(':')) {
+      return encryptedContent; // Return as-is if not encrypted
+    }
+
+    const parts = encryptedContent.split(':');
+    if (parts.length !== 2) {
+      return encryptedContent; // Return as-is if format is invalid
+    }
+
+    const [ivHex, encryptedHex] = parts;
+
+    // Create a deterministic key from the address using Web Crypto API
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw',
+      stringToArrayBuffer(keyAddress),
+      { name: 'PBKDF2' },
+      false,
+      ['deriveKey']
+    );
+
+    const key = await crypto.subtle.deriveKey(
+      {
+        name: 'PBKDF2',
+        salt: stringToArrayBuffer('salt'), // Same salt as encryption
+        iterations: 100000,
+        hash: 'SHA-256'
+      },
+      keyMaterial,
+      { name: 'AES-GCM', length: 256 },
+      false,
+      ['decrypt']
+    );
+
+    // Convert hex back to ArrayBuffers
+    const iv = hexToArrayBuffer(ivHex);
+    const encryptedData = hexToArrayBuffer(encryptedHex);
+
+    // Decrypt the content
+    const decrypted = await crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv: iv },
+      key,
+      encryptedData
+    );
+
+    // Convert back to string
+    const decoder = new TextDecoder();
+    return decoder.decode(decrypted);
+  } catch (error) {
+    console.error('Decryption error:', error);
+    // Fallback: return encrypted content if decryption fails
+    return encryptedContent;
+  }
+};
+
 export const useDiaryContract = () => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -37,7 +168,7 @@ export const useDiaryContract = () => {
     return contract;
   };
 
-  const addEntry = async (content: string, authorAddress: string) => {
+  const addEntry = async (content: string) => {
     try {
       if (!address) {
         throw new Error('Wallet not connected');
@@ -57,17 +188,25 @@ export const useDiaryContract = () => {
 
       // Create encrypted input for author address
       const input = fheInstance.createEncryptedInput(CONTRACT_ADDRESS, address);
-      input.addAddress(authorAddress);
+
+      // Generate random key address for encryption
+      const keyAddress = generateRandomAddress();
+      console.log('Generated key address:', keyAddress);
+
+      input.addAddress(keyAddress);
       const encryptedInput = await input.encrypt();
 
       // Get contract instance
-      const contract =await getContract();
-      console.log("addEntry:",content,        encryptedInput.handles[0],
-        encryptedInput.inputProof);
-      
+      const contract = await getContract();
+      console.log("addEntry:", content, encryptedInput.handles[0], encryptedInput.inputProof);
+
+      // Encrypt content using the generated key address
+      const encryptContent = await encryptString(content, keyAddress);
+      console.log('Encrypted content:', encryptContent);
+
       // Call addEntry function
       const tx = await contract.addEntry(
-        content,
+        encryptContent,
         encryptedInput.handles[0],
         encryptedInput.inputProof
       );
@@ -104,9 +243,17 @@ export const useDiaryContract = () => {
       console.log(`useDiaryContract: Getting content for entry ${entryId}`);
       const contract = await getContract();
       console.log(`useDiaryContract: Got signed contract for entry ${entryId}`);
-      const content = await contract.getEntryContent(entryId);
-      console.log(`useDiaryContract: Got content for entry ${entryId}:`, content);
-      return content;
+
+      // Get the full entry to access encrypted author
+      const entry = await contract.getEntry(entryId);
+      console.log(`useDiaryContract: Got full entry for ${entryId}:`, entry);
+
+      const encryptedContent = entry.content;
+      console.log(`useDiaryContract: Encrypted content for entry ${entryId}:`, encryptedContent);
+
+      // For now, return the encrypted content as-is
+      // TODO: Implement decryption when we can decrypt the encryptedAuthor to get keyAddress
+      return encryptedContent;
     } catch (error) {
       console.error(`useDiaryContract: Error getting entry content for ID ${entryId}:`, error);
       throw error;
@@ -188,6 +335,7 @@ export const useDiaryContract = () => {
     entryExists,
     getUserEntries,
     getUserEntryCount,
+    decryptString,
     fheLoading,
     fheError
   };

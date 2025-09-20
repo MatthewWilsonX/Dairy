@@ -25,7 +25,7 @@ export const DiaryForm: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await addEntry(content.trim(), address);
+      await addEntry(content.trim());
       setContent('');
       alert('Diary entry added successfully!');
     } catch (error) {
