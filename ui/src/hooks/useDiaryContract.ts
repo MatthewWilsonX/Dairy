@@ -1,3 +1,4 @@
+import { ethers } from 'ethers';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../config/contracts';
 import { useZamaInstance } from './useZamaInstance';
@@ -163,14 +164,24 @@ export const useDiaryContract = () => {
   const { data: walletClient } = useWalletClient();
   const { instance: fheInstance, isLoading: fheLoading } = useZamaInstance();
 
+  const getContract = async () => {
+    if (!walletClient) {
+      console.error('useDiaryContract: Wallet not connected');
+      throw new Error('Wallet not connected');
+    }
+
+    console.log('useDiaryContract: Creating contract with address:', CONTRACT_ADDRESS);
+    const provider = new ethers.BrowserProvider(walletClient);
+    const signer = await provider.getSigner();
+    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    console.log('useDiaryContract: Created signed contract');
+    return contract;
+  };
+
   const addEntry = async (content: string) => {
     try {
       if (!address) {
         throw new Error('Wallet not connected');
-      }
-
-      if (!walletClient) {
-        throw new Error('Wallet client not available');
       }
 
       if (!fheInstance) {
@@ -191,34 +202,26 @@ export const useDiaryContract = () => {
       input.addAddress(keyAddress);
       const encryptedInput = await input.encrypt();
 
+      // Get contract instance using ethers
+      const contract = await getContract();
       console.log("addEntry:", content, encryptedInput.handles[0], encryptedInput.inputProof);
 
       // Encrypt content using the generated key address
       const encryptContent = await encryptString(content, keyAddress);
       console.log('Encrypted content:', encryptContent);
 
-      // Call addEntry function using viem
-      const hash = await walletClient.writeContract({
-        address: CONTRACT_ADDRESS as `0x${string}`,
-        abi: CONTRACT_ABI,
-        functionName: 'addEntry',
-        args: [
-          encryptContent,
-          encryptedInput.handles[0],
-          encryptedInput.inputProof
-        ],
-      });
+      // Call addEntry function using ethers
+      const tx = await contract.addEntry(
+        encryptContent,
+        encryptedInput.handles[0],
+        encryptedInput.inputProof
+      );
 
-      console.log('Transaction sent:', hash);
+      console.log('Transaction sent:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Transaction confirmed:', receipt);
 
-      // Wait for transaction confirmation
-      if (publicClient) {
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
-        console.log('Transaction confirmed:', receipt);
-        return receipt;
-      }
-
-      return { hash };
+      return receipt;
     } catch (error) {
       console.error('Error adding diary entry:', error);
       throw error;
