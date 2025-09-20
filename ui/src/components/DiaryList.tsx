@@ -7,7 +7,6 @@ interface DiaryEntry {
   id: number;
   content: string;
   timestamp: number;
-  hasAccess: boolean;
 }
 
 export const DiaryList: React.FC = () => {
@@ -15,7 +14,7 @@ export const DiaryList: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [totalEntries, setTotalEntries] = useState(0);
   const { address } = useAccount();
-  const { getTotalEntries, getEntryContent, hasAccess } = useDiaryContract();
+  const { getTotalEntries, getEntryContent } = useDiaryContract();
 
   const loadEntries = async () => {
     if (!address) return;
@@ -45,24 +44,12 @@ export const DiaryList: React.FC = () => {
 
   const loadSingleEntry = async (entryId: number): Promise<DiaryEntry | null> => {
     try {
-      const userHasAccess = await hasAccess(entryId, address!);
-
-      if (!userHasAccess) {
-        return {
-          id: entryId,
-          content: 'No access to this entry',
-          timestamp: 0,
-          hasAccess: false
-        };
-      }
-
       const content = await getEntryContent(entryId);
 
       return {
         id: entryId,
         content,
-        timestamp: Date.now(), // We'll use current time as placeholder since we can't access timestamp without full entry
-        hasAccess: true
+        timestamp: Date.now()
       };
     } catch (error) {
       console.error(`Error loading entry ${entryId}:`, error);
@@ -117,17 +104,13 @@ export const DiaryList: React.FC = () => {
           {entries.map((entry) => (
             <div
               key={entry.id}
-              className={`diary-entry ${
-                entry.hasAccess
-                  ? 'diary-entry-accessible'
-                  : 'diary-entry-restricted'
-              }`}
+              className="diary-entry diary-entry-accessible"
             >
               <div className="diary-entry-header">
                 <span className="diary-entry-id">
                   Entry #{entry.id}
                 </span>
-                {entry.hasAccess && entry.timestamp > 0 && (
+                {entry.timestamp > 0 && (
                   <span className="diary-entry-timestamp">
                     {formatDate(entry.timestamp)}
                   </span>
@@ -135,16 +118,7 @@ export const DiaryList: React.FC = () => {
               </div>
 
               <div className="diary-entry-content">
-                {entry.hasAccess ? (
-                  <p className="diary-entry-text">{entry.content}</p>
-                ) : (
-                  <div className="diary-entry-restricted-content">
-                    <svg className="diary-entry-lock-icon" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                    </svg>
-                    <span className="diary-entry-restricted-text">{entry.content}</span>
-                  </div>
-                )}
+                <p className="diary-entry-text">{entry.content}</p>
               </div>
             </div>
           ))}

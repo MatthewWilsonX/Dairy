@@ -87,7 +87,7 @@ export const useDiaryContract = () => {
 
   const getEntryContent = async (entryId: number): Promise<string> => {
     try {
-      const contract = getContract(); // Use signed contract to check access
+      const contract = await getContract(); // Use signed contract to check access
       const content = await contract.getEntryContent(entryId);
       return content;
     } catch (error) {
@@ -98,12 +98,12 @@ export const useDiaryContract = () => {
 
   const getEntry = async (entryId: number) => {
     try {
-      const contract = getContract();
-      const [content, encryptedAuthor, timestamp] = await contract.getEntry(entryId);
+      const contract = await getContract();
+      const entry = await contract.getEntry(entryId);
       return {
-        content,
-        encryptedAuthor,
-        timestamp: Number(timestamp)
+        content: entry.content,
+        encryptedAuthor: entry.encryptedAuthor,
+        timestamp: Number(entry.timestamp)
       };
     } catch (error) {
       console.error(`Error getting entry for ID ${entryId}:`, error);
@@ -111,30 +111,7 @@ export const useDiaryContract = () => {
     }
   };
 
-  const hasAccess = async (entryId: number, userAddress: string): Promise<boolean> => {
-    try {
-      const contract = getReadOnlyContract();
-      const access = await contract.hasAccess(entryId, userAddress);
-      return access;
-    } catch (error) {
-      console.error(`Error checking access for entry ${entryId}:`, error);
-      return false;
-    }
-  };
 
-  const grantAccess = async (entryId: number, userAddress: string) => {
-    try {
-      const contract = getContract();
-      const tx = await contract.grantAccess(entryId, userAddress);
-      console.log('Grant access transaction sent:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('Grant access transaction confirmed:', receipt);
-      return receipt;
-    } catch (error) {
-      console.error(`Error granting access for entry ${entryId}:`, error);
-      throw error;
-    }
-  };
 
   const entryExists = async (entryId: number): Promise<boolean> => {
     try {
@@ -147,23 +124,10 @@ export const useDiaryContract = () => {
     }
   };
 
-  const revokeAccess = async (entryId: number, userAddress: string) => {
-    try {
-      const contract = getContract();
-      const tx = await contract.revokeAccess(entryId, userAddress);
-      console.log('Revoke access transaction sent:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('Revoke access transaction confirmed:', receipt);
-      return receipt;
-    } catch (error) {
-      console.error(`Error revoking access for entry ${entryId}:`, error);
-      throw error;
-    }
-  };
 
   const getEntryAuthor = async (entryId: number) => {
     try {
-      const contract = getContract();
+      const contract = await getContract();
       const encryptedAuthor = await contract.getEntryAuthor(entryId);
       return encryptedAuthor;
     } catch (error) {
@@ -178,9 +142,6 @@ export const useDiaryContract = () => {
     getEntryContent,
     getEntry,
     getEntryAuthor,
-    hasAccess,
-    grantAccess,
-    revokeAccess,
     entryExists,
     fheLoading,
     fheError
