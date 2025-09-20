@@ -145,13 +145,40 @@ export const useDiaryContract = () => {
     }
   };
 
+  const revokeAccess = async (entryId: number, userAddress: string) => {
+    try {
+      const contract = getContract();
+      const tx = await contract.revokeAccess(entryId, userAddress);
+      console.log('Revoke access transaction sent:', tx.hash);
+      const receipt = await tx.wait();
+      console.log('Revoke access transaction confirmed:', receipt);
+      return receipt;
+    } catch (error) {
+      console.error(`Error revoking access for entry ${entryId}:`, error);
+      throw error;
+    }
+  };
+
+  const getEntryAuthor = async (entryId: number) => {
+    try {
+      const contract = getContract();
+      const encryptedAuthor = await contract.getEntryAuthor(entryId);
+      return encryptedAuthor;
+    } catch (error) {
+      console.error(`Error getting entry author for ID ${entryId}:`, error);
+      throw error;
+    }
+  };
+
   return {
     addEntry,
     getTotalEntries,
     getEntryContent,
     getEntry,
+    getEntryAuthor,
     hasAccess,
     grantAccess,
+    revokeAccess,
     entryExists,
     fheLoading,
     fheError
