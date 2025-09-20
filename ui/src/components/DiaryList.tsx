@@ -12,47 +12,72 @@ interface DiaryEntry {
 export const DiaryList: React.FC = () => {
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [totalEntries, setTotalEntries] = useState(0);
+  const [userEntryCount, setUserEntryCount] = useState(0);
   const { address } = useAccount();
-  const { getTotalEntries, getEntryContent } = useDiaryContract();
+  const { getEntryContent, getUserEntries, getUserEntryCount } = useDiaryContract();
 
   const loadEntries = async () => {
-    if (!address) return;
+    if (!address) {
+      console.log('DiaryList: No address, skipping load');
+      return;
+    }
 
+    console.log('DiaryList: Starting to load entries for address:', address);
     setIsLoading(true);
     try {
-      const total = await getTotalEntries();
-      setTotalEntries(total);
+      // Get user specific entries
+      const userCount = await getUserEntryCount(address);
+      console.log('DiaryList: User entry count:', userCount);
+      setUserEntryCount(userCount);
 
-      const entryPromises = [];
-      for (let i = 1; i <= total; i++) {
-        entryPromises.push(loadSingleEntry(i));
+      if (userCount === 0) {
+        console.log('DiaryList: No user entries to load');
+        setEntries([]);
+        return;
       }
 
+      const userEntryIds = await getUserEntries(address);
+      console.log('DiaryList: User entry IDs:', userEntryIds);
+
+      const entryPromises = userEntryIds.map(entryId => {
+        console.log(`DiaryList: Preparing to load user entry ${entryId}`);
+        return loadSingleEntry(entryId);
+      });
+
+      console.log('DiaryList: Loading', entryPromises.length, 'user entries');
       const loadedEntries = await Promise.all(entryPromises);
+      console.log('DiaryList: Loaded user entries:', loadedEntries);
+
       const validEntries = loadedEntries.filter(entry => entry !== null) as DiaryEntry[];
+      console.log('DiaryList: Valid user entries after filtering:', validEntries);
 
       // Sort by timestamp (newest first)
       validEntries.sort((a, b) => b.timestamp - a.timestamp);
+      console.log('DiaryList: Sorted user entries:', validEntries);
       setEntries(validEntries);
     } catch (error) {
-      console.error('Error loading entries:', error);
+      console.error('DiaryList: Error loading entries:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   const loadSingleEntry = async (entryId: number): Promise<DiaryEntry | null> => {
+    console.log(`DiaryList: Loading single entry ${entryId}`);
     try {
+      console.log(`DiaryList: Calling getEntryContent for entry ${entryId}`);
       const content = await getEntryContent(entryId);
+      console.log(`DiaryList: Got content for entry ${entryId}:`, content);
 
-      return {
+      const entry = {
         id: entryId,
         content,
         timestamp: Date.now()
       };
+      console.log(`DiaryList: Created entry object for ${entryId}:`, entry);
+      return entry;
     } catch (error) {
-      console.error(`Error loading entry ${entryId}:`, error);
+      console.error(`DiaryList: Error loading entry ${entryId}:`, error);
       return null;
     }
   };
@@ -79,7 +104,7 @@ export const DiaryList: React.FC = () => {
     <div className="diary-list">
       <div className="diary-list-header">
         <h2 className="diary-list-title">
-          My Diary Entries ({totalEntries})
+          My Diary Entries ({userEntryCount})
         </h2>
         <button
           onClick={refreshEntries}
