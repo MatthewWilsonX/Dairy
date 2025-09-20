@@ -8,23 +8,23 @@ import {SepoliaConfig} from "@fhevm/solidity/config/ZamaConfig.sol";
 /// @author Zama FHE
 /// @notice This contract allows users to store diary entries with encrypted author addresses while keeping content as plaintext
 contract OnChainDiary is SepoliaConfig {
-
     /// @notice Structure representing a diary entry
     struct DiaryEntry {
-        string content;           // Plaintext content of the diary
+        address owner;
+        string content; // Plaintext content of the diary
         eaddress encryptedAuthor; // Encrypted address of the author
-        uint256 timestamp;       // Timestamp when the entry was created
-        bool exists;             // Whether this entry exists
+        uint256 timestamp; // Timestamp when the entry was created
+        bool exists; // Whether this entry exists
     }
 
     /// @notice Mapping from entry ID to diary entry
     mapping(uint256 => DiaryEntry) private entries;
 
+    /// @notice Mapping from user address to their entry IDs
+    mapping(address => uint256[]) private userEntries;
+
     /// @notice Counter for generating unique entry IDs
     uint256 private nextEntryId;
-
-    /// @notice Mapping to track which users have access to which entries
-    mapping(uint256 => mapping(address => bool)) public entryAccess;
 
     /// @notice Events
     event DiaryEntryAdded(uint256 indexed entryId, address indexed author, uint256 timestamp);
@@ -53,37 +53,28 @@ contract OnChainDiary is SepoliaConfig {
 
         // Create the diary entry
         entries[entryId] = DiaryEntry({
+            owner: msg.sender,
             content: content,
             encryptedAuthor: encryptedAuthor,
             timestamp: block.timestamp,
             exists: true
         });
 
+        // Add entry ID to user's list
+        userEntries[msg.sender].push(entryId);
+
         // Grant access permissions
         FHE.allowThis(encryptedAuthor);
         FHE.allow(encryptedAuthor, msg.sender);
 
-        // Grant access to the entry creator
-        entryAccess[entryId][msg.sender] = true;
-
         emit DiaryEntryAdded(entryId, msg.sender, block.timestamp);
     }
 
-    /// @notice Get a diary entry by ID
-    /// @param entryId The ID of the entry to retrieve
-    /// @return content The plaintext content
-    /// @return encryptedAuthor The encrypted author address
-    /// @return timestamp The creation timestamp
-    function getEntry(uint256 entryId)
-        external
-        view
-        returns (string memory content, eaddress encryptedAuthor, uint256 timestamp)
-    {
+    function getEntry(uint256 entryId) external view returns (DiaryEntry memory) {
         require(entries[entryId].exists, "Entry does not exist");
-        require(entryAccess[entryId][msg.sender], "Access denied");
 
         DiaryEntry storage entry = entries[entryId];
-        return (entry.content, entry.encryptedAuthor, entry.timestamp);
+        return entry;
     }
 
     /// @notice Get only the plaintext content of an entry
@@ -91,7 +82,6 @@ contract OnChainDiary is SepoliaConfig {
     /// @return content The plaintext content
     function getEntryContent(uint256 entryId) external view returns (string memory content) {
         require(entries[entryId].exists, "Entry does not exist");
-        require(entryAccess[entryId][msg.sender], "Access denied");
 
         return entries[entryId].content;
     }
@@ -101,36 +91,8 @@ contract OnChainDiary is SepoliaConfig {
     /// @return encryptedAuthor The encrypted author address
     function getEntryAuthor(uint256 entryId) external view returns (eaddress encryptedAuthor) {
         require(entries[entryId].exists, "Entry does not exist");
-        require(entryAccess[entryId][msg.sender], "Access denied");
 
         return entries[entryId].encryptedAuthor;
-    }
-
-    /// @notice Grant access to an entry to another user
-    /// @param entryId The ID of the entry
-    /// @param user The address to grant access to
-    function grantAccess(uint256 entryId, address user) external {
-        require(entries[entryId].exists, "Entry does not exist");
-        require(entryAccess[entryId][msg.sender], "Only authorized users can grant access");
-
-        entryAccess[entryId][user] = true;
-
-        // Grant FHE access to the encrypted author for the new user
-        FHE.allow(entries[entryId].encryptedAuthor, user);
-
-        emit AccessGranted(entryId, user);
-    }
-
-    /// @notice Revoke access to an entry from a user
-    /// @param entryId The ID of the entry
-    /// @param user The address to revoke access from
-    function revokeAccess(uint256 entryId, address user) external {
-        require(entries[entryId].exists, "Entry does not exist");
-        require(entryAccess[entryId][msg.sender], "Only authorized users can revoke access");
-
-        entryAccess[entryId][user] = false;
-
-        emit AccessRevoked(entryId, user);
     }
 
     /// @notice Check if an entry exists
@@ -146,11 +108,26 @@ contract OnChainDiary is SepoliaConfig {
         return nextEntryId - 1;
     }
 
-    /// @notice Check if a user has access to an entry
-    /// @param entryId The entry ID
-    /// @param user The user address
-    /// @return userHasAccess Whether the user has access
-    function hasAccess(uint256 entryId, address user) external view returns (bool userHasAccess) {
-        return entryAccess[entryId][user];
+    /// @notice Get the number of diary entries for a specific user
+    /// @param user The address of the user
+    /// @return count The number of diary entries for the user
+    function getUserEntryCount(address user) external view returns (uint256 count) {
+        return userEntries[user].length;
+    }
+
+    /// @notice Get all entry IDs for a specific user
+    /// @param user The address of the user
+    /// @return entryIds Array of entry IDs belonging to the user
+    function getUserEntries(address user) external view returns (uint256[] memory entryIds) {
+        return userEntries[user];
+    }
+
+    /// @notice Get a specific entry ID for a user by index
+    /// @param user The address of the user
+    /// @param index The index in the user's entry list
+    /// @return entryId The entry ID at the specified index
+    function getUserEntryByIndex(address user, uint256 index) external view returns (uint256 entryId) {
+        require(index < userEntries[user].length, "Index out of bounds");
+        return userEntries[user][index];
     }
 }
