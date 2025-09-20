@@ -21,7 +21,7 @@ export const DiaryList: React.FC = () => {
   const { address } = useAccount();
   const { data: walletClient } = useWalletClient();
   const { getUserEntries, getUserEntryCount, getEntry, decryptString } = useDiaryContract();
-  const { instance: fheInstance, isLoading: fheLoading, error: fheError } = useZamaInstance();
+  const { instance: fheInstance, isLoading: fheLoading } = useZamaInstance();
 
   const loadEntries = async () => {
     if (!address) {
