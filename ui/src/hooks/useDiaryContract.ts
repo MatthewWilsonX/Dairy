@@ -1,4 +1,3 @@
-import { ethers } from 'ethers';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../config/contracts';
 import { useZamaInstance } from './useZamaInstance';
@@ -162,40 +161,16 @@ export const useDiaryContract = () => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
-  const { instance: fheInstance, isLoading: fheLoading, error: fheError } = useZamaInstance();
-
-  const getContract = async () => {
-    if (!walletClient) {
-      console.error('useDiaryContract: Wallet not connected');
-      throw new Error('Wallet not connected');
-    }
-
-    console.log('useDiaryContract: Creating contract with address:', CONTRACT_ADDRESS);
-    const provider = new ethers.BrowserProvider(walletClient);
-    const signer = await provider.getSigner();
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-    console.log('useDiaryContract: Created signed contract');
-    return contract;
-  };
-
-  const getReadOnlyContract = () => {
-    if (!publicClient) {
-      console.error('useDiaryContract: Public client not available');
-      throw new Error('Public client not available');
-    }
-
-    console.log('useDiaryContract: Creating read-only contract with address:', CONTRACT_ADDRESS);
-    console.log('useDiaryContract: Using RPC URL:', publicClient.transport.url);
-    const provider = new ethers.JsonRpcProvider(publicClient.transport.url);
-    const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, provider);
-    console.log('useDiaryContract: Created read-only contract');
-    return contract;
-  };
+  const { instance: fheInstance, isLoading: fheLoading } = useZamaInstance();
 
   const addEntry = async (content: string) => {
     try {
       if (!address) {
         throw new Error('Wallet not connected');
+      }
+
+      if (!walletClient) {
+        throw new Error('Wallet client not available');
       }
 
       if (!fheInstance) {
@@ -204,10 +179,6 @@ export const useDiaryContract = () => {
 
       if (fheLoading) {
         throw new Error('FHE instance still loading');
-      }
-
-      if (fheError) {
-        throw new Error(`FHE initialization error: ${fheError}`);
       }
 
       // Create encrypted input for author address
@@ -220,26 +191,34 @@ export const useDiaryContract = () => {
       input.addAddress(keyAddress);
       const encryptedInput = await input.encrypt();
 
-      // Get contract instance
-      const contract = await getContract();
       console.log("addEntry:", content, encryptedInput.handles[0], encryptedInput.inputProof);
 
       // Encrypt content using the generated key address
       const encryptContent = await encryptString(content, keyAddress);
       console.log('Encrypted content:', encryptContent);
 
-      // Call addEntry function
-      const tx = await contract.addEntry(
-        encryptContent,
-        encryptedInput.handles[0],
-        encryptedInput.inputProof
-      );
+      // Call addEntry function using viem
+      const hash = await walletClient.writeContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'addEntry',
+        args: [
+          encryptContent,
+          encryptedInput.handles[0],
+          encryptedInput.inputProof
+        ],
+      });
 
-      console.log('Transaction sent:', tx.hash);
-      const receipt = await tx.wait();
-      console.log('Transaction confirmed:', receipt);
+      console.log('Transaction sent:', hash);
 
-      return receipt;
+      // Wait for transaction confirmation
+      if (publicClient) {
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log('Transaction confirmed:', receipt);
+        return receipt;
+      }
+
+      return { hash };
     } catch (error) {
       console.error('Error adding diary entry:', error);
       throw error;
@@ -249,9 +228,17 @@ export const useDiaryContract = () => {
   const getTotalEntries = async (): Promise<number> => {
     try {
       console.log('useDiaryContract: Getting total entries');
-      const contract = getReadOnlyContract();
-      console.log('useDiaryContract: Got read-only contract');
-      const total = await contract.getTotalEntries();
+
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const total = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'getTotalEntries',
+      });
+
       console.log('useDiaryContract: Total entries from contract:', total);
       const totalNumber = Number(total);
       console.log('useDiaryContract: Total entries as number:', totalNumber);
@@ -265,14 +252,20 @@ export const useDiaryContract = () => {
   const getEntryContent = async (entryId: number): Promise<string> => {
     try {
       console.log(`useDiaryContract: Getting content for entry ${entryId}`);
-      const contract = await getContract();
-      console.log(`useDiaryContract: Got signed contract for entry ${entryId}`);
 
-      // Get just the content using the dedicated function
-      const content = await contract.getEntryContent(entryId);
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const content = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'getEntryContent',
+        args: [BigInt(entryId)],
+      });
+
       console.log(`useDiaryContract: Got content for entry ${entryId}:`, content);
-
-      return content;
+      return content as string;
     } catch (error) {
       console.error(`useDiaryContract: Error getting entry content for ID ${entryId}:`, error);
       throw error;
@@ -281,8 +274,17 @@ export const useDiaryContract = () => {
 
   const getEntry = async (entryId: number) => {
     try {
-      const contract = await getContract();
-      const entry = await contract.getEntry(entryId);
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const entry = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'getEntry',
+        args: [BigInt(entryId)],
+      }) as any;
+
       return {
         content: entry.content,
         encryptedAuthor: entry.encryptedAuthor,
@@ -298,9 +300,18 @@ export const useDiaryContract = () => {
 
   const entryExists = async (entryId: number): Promise<boolean> => {
     try {
-      const contract = getReadOnlyContract();
-      const exists = await contract.entryExists(entryId);
-      return exists;
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const exists = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'entryExists',
+        args: [BigInt(entryId)],
+      });
+
+      return exists as boolean;
     } catch (error) {
       console.error(`Error checking if entry ${entryId} exists:`, error);
       return false;
@@ -310,8 +321,17 @@ export const useDiaryContract = () => {
 
   const getEntryAuthor = async (entryId: number) => {
     try {
-      const contract = await getContract();
-      const encryptedAuthor = await contract.getEntryAuthor(entryId);
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const encryptedAuthor = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'getEntryAuthor',
+        args: [BigInt(entryId)],
+      });
+
       return encryptedAuthor;
     } catch (error) {
       console.error(`Error getting entry author for ID ${entryId}:`, error);
@@ -322,10 +342,20 @@ export const useDiaryContract = () => {
   const getUserEntries = async (userAddress: string): Promise<number[]> => {
     try {
       console.log(`useDiaryContract: Getting user entries for address: ${userAddress}`);
-      const contract = getReadOnlyContract();
-      const entryIds = await contract.getUserEntries(userAddress);
+
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const entryIds = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'getUserEntries',
+        args: [userAddress as `0x${string}`],
+      });
+
       console.log(`useDiaryContract: Got user entries:`, entryIds);
-      return entryIds.map((id: any) => Number(id));
+      return (entryIds as bigint[]).map((id: bigint) => Number(id));
     } catch (error) {
       console.error(`useDiaryContract: Error getting user entries for ${userAddress}:`, error);
       throw error;
@@ -335,8 +365,18 @@ export const useDiaryContract = () => {
   const getUserEntryCount = async (userAddress: string): Promise<number> => {
     try {
       console.log(`useDiaryContract: Getting user entry count for address: ${userAddress}`);
-      const contract = getReadOnlyContract();
-      const count = await contract.getUserEntryCount(userAddress);
+
+      if (!publicClient) {
+        throw new Error('Public client not available');
+      }
+
+      const count = await publicClient.readContract({
+        address: CONTRACT_ADDRESS as `0x${string}`,
+        abi: CONTRACT_ABI,
+        functionName: 'getUserEntryCount',
+        args: [userAddress as `0x${string}`],
+      });
+
       console.log(`useDiaryContract: Got user entry count:`, count);
       return Number(count);
     } catch (error) {
@@ -355,7 +395,6 @@ export const useDiaryContract = () => {
     getUserEntries,
     getUserEntryCount,
     decryptString,
-    fheLoading,
-    fheError
+    fheLoading
   };
 };
