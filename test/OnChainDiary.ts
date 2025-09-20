@@ -38,250 +38,311 @@ describe("OnChainDiary", function () {
     ({ onChainDiaryContract, onChainDiaryContractAddress } = await deployFixture());
   });
 
-  it("should deploy correctly and have zero diary count initially", async function () {
-    const aliceCount = await onChainDiaryContract.getUserDiaryCount(signers.alice.address);
-    const bobCount = await onChainDiaryContract.getUserDiaryCount(signers.bob.address);
-    
-    expect(aliceCount).to.eq(0);
-    expect(bobCount).to.eq(0);
+  it("should deploy correctly and have zero total entries initially", async function () {
+    const totalEntries = await onChainDiaryContract.getTotalEntries();
+    expect(totalEntries).to.eq(0);
   });
 
-  it("should save a diary entry with encrypted IPFS hash", async function () {
-    // Mock IPFS hash as a large number (representing the hash as uint256)
-    const mockIpfsHash = "12345678901234567890123456789012345678901234567890123456789012345678";
-    const mockIpfsHashBigInt = BigInt(mockIpfsHash);
+  it("should add a diary entry with encrypted author address", async function () {
+    const content = "This is my first diary entry";
 
-    // Encrypt the IPFS hash as euint256
-    const encryptedIpfsHash = await fhevm
+    // Create encrypted input for author address
+    const encryptedAuthor = await fhevm
       .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-      .add256(mockIpfsHashBigInt)
+      .addAddress(signers.alice.address)
       .encrypt();
 
-    const beforeCount = await onChainDiaryContract.getUserDiaryCount(signers.alice.address);
-    expect(beforeCount).to.eq(0);
-
-    // Save the diary entry
+    // Add diary entry
     const tx = await onChainDiaryContract
       .connect(signers.alice)
-      .saveDiary(encryptedIpfsHash.handles[0], encryptedIpfsHash.inputProof);
-    
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
+
     const receipt = await tx.wait();
 
-    // Check diary count increased
-    const afterCount = await onChainDiaryContract.getUserDiaryCount(signers.alice.address);
-    expect(afterCount).to.eq(1);
+    // Check total entries increased
+    const totalEntries = await onChainDiaryContract.getTotalEntries();
+    expect(totalEntries).to.eq(1);
+
+    // Check the entry exists
+    const entryExists = await onChainDiaryContract.entryExists(1);
+    expect(entryExists).to.be.true;
+
+    // Check access was granted to the creator
+    const hasAccess = await onChainDiaryContract.hasAccess(1, signers.alice.address);
+    expect(hasAccess).to.be.true;
 
     // Check event was emitted
     expect(receipt?.logs).to.have.length.greaterThan(0);
   });
 
   it("should retrieve a diary entry correctly", async function () {
-    // Mock IPFS hash
-    const mockIpfsHash = "98765432109876543210987654321098765432109876543210987654321098765432";
-    const mockIpfsHashBigInt = BigInt(mockIpfsHash);
+    const content = "My secret thoughts";
 
-    // Encrypt and save diary
-    const encryptedIpfsHash = await fhevm
+    // Create and add diary entry
+    const encryptedAuthor = await fhevm
       .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-      .add256(mockIpfsHashBigInt)
+      .addAddress(signers.alice.address)
       .encrypt();
 
     await onChainDiaryContract
       .connect(signers.alice)
-      .saveDiary(encryptedIpfsHash.handles[0], encryptedIpfsHash.inputProof);
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
 
     // Retrieve the diary entry
-    const [encryptedHash, timestamp] = await onChainDiaryContract.getDiaryEntry(signers.alice.address, 0);
+    const [retrievedContent, encryptedAuthorHandle, timestamp] = await onChainDiaryContract
+      .connect(signers.alice)
+      .getEntry(1);
 
-    // Decrypt and verify the hash
-    const decryptedHash = await fhevm.userDecryptEuint(
-      FhevmType.euint256,
-      encryptedHash,
-      onChainDiaryContractAddress,
-      signers.alice,
-    );
-
-    expect(decryptedHash).to.eq(mockIpfsHashBigInt);
+    expect(retrievedContent).to.eq(content);
     expect(timestamp).to.be.greaterThan(0);
-  });
 
-  it("should retrieve latest diary entry", async function () {
-    // Save multiple diary entries
-    const hashes = [
-      BigInt("11111111111111111111111111111111111111111111111111111111111111111111"),
-      BigInt("22222222222222222222222222222222222222222222222222222222222222222222"),
-      BigInt("33333333333333333333333333333333333333333333333333333333333333333333"),
-    ];
-
-    for (const hash of hashes) {
-      const encryptedInput = await fhevm
-        .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-        .add256(hash)
-        .encrypt();
-
-      await onChainDiaryContract
-        .connect(signers.alice)
-        .saveDiary(encryptedInput.handles[0], encryptedInput.inputProof);
-    }
-
-    // Get latest entry
-    const [encryptedHash, timestamp, index] = await onChainDiaryContract.getLatestDiary(signers.alice.address);
-
-    // Verify it's the last hash we saved
-    const decryptedHash = await fhevm.userDecryptEuint(
-      FhevmType.euint256,
-      encryptedHash,
+    // Decrypt and verify the author address (eaddress is treated as euint160)
+    const decryptedAuthor = await fhevm.userDecryptEuint(
+      FhevmType.euint160,
+      encryptedAuthorHandle,
       onChainDiaryContractAddress,
       signers.alice,
     );
 
-    expect(decryptedHash).to.eq(hashes[2]); // Should be the last hash
-    expect(index).to.eq(2); // Should be index 2 (third entry)
+    // Convert BigInt address back to hex string
+    const expectedAddress = BigInt(signers.alice.address);
+    expect(decryptedAuthor).to.eq(expectedAddress);
   });
 
-  it("should retrieve all diary entries for a user", async function () {
-    const hashes = [
-      BigInt("44444444444444444444444444444444444444444444444444444444444444444444"),
-      BigInt("55555555555555555555555555555555555555555555555555555555555555555555"),
+  it("should retrieve only content of an entry", async function () {
+    const content = "Today was a good day";
+
+    const encryptedAuthor = await fhevm
+      .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
+      .addAddress(signers.alice.address)
+      .encrypt();
+
+    await onChainDiaryContract
+      .connect(signers.alice)
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
+
+    const retrievedContent = await onChainDiaryContract
+      .connect(signers.alice)
+      .getEntryContent(1);
+
+    expect(retrievedContent).to.eq(content);
+  });
+
+  it("should retrieve only encrypted author of an entry", async function () {
+    const content = "Weather is nice";
+
+    const encryptedAuthor = await fhevm
+      .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
+      .addAddress(signers.alice.address)
+      .encrypt();
+
+    await onChainDiaryContract
+      .connect(signers.alice)
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
+
+    const encryptedAuthorHandle = await onChainDiaryContract
+      .connect(signers.alice)
+      .getEntryAuthor(1);
+
+    // Decrypt and verify the author address (eaddress is treated as euint160)
+    const decryptedAuthor = await fhevm.userDecryptEuint(
+      FhevmType.euint160,
+      encryptedAuthorHandle,
+      onChainDiaryContractAddress,
+      signers.alice,
+    );
+
+    // Convert BigInt address back to hex string
+    const expectedAddress = BigInt(signers.alice.address);
+    expect(decryptedAuthor).to.eq(expectedAddress);
+  });
+
+  it("should grant and revoke access correctly", async function () {
+    const content = "Shared diary entry";
+
+    const encryptedAuthor = await fhevm
+      .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
+      .addAddress(signers.alice.address)
+      .encrypt();
+
+    await onChainDiaryContract
+      .connect(signers.alice)
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
+
+    // Initially Bob doesn't have access
+    let hasAccess = await onChainDiaryContract.hasAccess(1, signers.bob.address);
+    expect(hasAccess).to.be.false;
+
+    // Alice grants access to Bob
+    await onChainDiaryContract
+      .connect(signers.alice)
+      .grantAccess(1, signers.bob.address);
+
+    // Now Bob has access
+    hasAccess = await onChainDiaryContract.hasAccess(1, signers.bob.address);
+    expect(hasAccess).to.be.true;
+
+    // Bob can read the entry
+    const [retrievedContent] = await onChainDiaryContract
+      .connect(signers.bob)
+      .getEntry(1);
+    expect(retrievedContent).to.eq(content);
+
+    // Alice revokes access
+    await onChainDiaryContract
+      .connect(signers.alice)
+      .revokeAccess(1, signers.bob.address);
+
+    // Bob no longer has access
+    hasAccess = await onChainDiaryContract.hasAccess(1, signers.bob.address);
+    expect(hasAccess).to.be.false;
+  });
+
+  it("should handle multiple diary entries", async function () {
+    const entries = [
+      "First entry",
+      "Second entry",
+      "Third entry"
     ];
 
-    // Save diary entries
-    for (const hash of hashes) {
-      const encryptedInput = await fhevm
+    // Add multiple entries
+    for (let i = 0; i < entries.length; i++) {
+      const encryptedAuthor = await fhevm
         .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-        .add256(hash)
+        .addAddress(signers.alice.address)
         .encrypt();
 
       await onChainDiaryContract
         .connect(signers.alice)
-        .saveDiary(encryptedInput.handles[0], encryptedInput.inputProof);
+        .addEntry(entries[i], encryptedAuthor.handles[0], encryptedAuthor.inputProof);
     }
 
-    // Get all diary entries
-    const [encryptedHashes, timestamps] = await onChainDiaryContract.getAllDiaries(signers.alice.address);
+    // Check total entries
+    const totalEntries = await onChainDiaryContract.getTotalEntries();
+    expect(totalEntries).to.eq(3);
 
-    expect(encryptedHashes.length).to.eq(2);
-    expect(timestamps.length).to.eq(2);
-
-    // Decrypt and verify each hash
-    for (let i = 0; i < encryptedHashes.length; i++) {
-      const decryptedHash = await fhevm.userDecryptEuint(
-        FhevmType.euint256,
-        encryptedHashes[i],
-        onChainDiaryContractAddress,
-        signers.alice,
-      );
-      expect(decryptedHash).to.eq(hashes[i]);
-      expect(timestamps[i]).to.be.greaterThan(0);
+    // Verify each entry
+    for (let i = 0; i < entries.length; i++) {
+      const [content] = await onChainDiaryContract
+        .connect(signers.alice)
+        .getEntry(i + 1);
+      expect(content).to.eq(entries[i]);
     }
   });
 
   it("should handle multiple users independently", async function () {
-    const aliceHash = BigInt("77777777777777777777777777777777777777777777777777777777777777777777");
-    const bobHash = BigInt("88888888888888888888888888888888888888888888888888888888888888888888");
+    const aliceContent = "Alice's diary";
+    const bobContent = "Bob's diary";
 
-    // Alice saves a diary
-    const aliceEncrypted = await fhevm
+    // Alice adds entry
+    const aliceEncryptedAuthor = await fhevm
       .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-      .add256(aliceHash)
+      .addAddress(signers.alice.address)
       .encrypt();
 
     await onChainDiaryContract
       .connect(signers.alice)
-      .saveDiary(aliceEncrypted.handles[0], aliceEncrypted.inputProof);
+      .addEntry(aliceContent, aliceEncryptedAuthor.handles[0], aliceEncryptedAuthor.inputProof);
 
-    // Bob saves a diary
-    const bobEncrypted = await fhevm
+    // Bob adds entry
+    const bobEncryptedAuthor = await fhevm
       .createEncryptedInput(onChainDiaryContractAddress, signers.bob.address)
-      .add256(bobHash)
+      .addAddress(signers.bob.address)
       .encrypt();
 
     await onChainDiaryContract
       .connect(signers.bob)
-      .saveDiary(bobEncrypted.handles[0], bobEncrypted.inputProof);
+      .addEntry(bobContent, bobEncryptedAuthor.handles[0], bobEncryptedAuthor.inputProof);
 
-    // Verify counts
-    expect(await onChainDiaryContract.getUserDiaryCount(signers.alice.address)).to.eq(1);
-    expect(await onChainDiaryContract.getUserDiaryCount(signers.bob.address)).to.eq(1);
+    // Verify Alice's entry
+    const [aliceRetrievedContent, aliceEncryptedAuthorHandle] = await onChainDiaryContract
+      .connect(signers.alice)
+      .getEntry(1);
+    expect(aliceRetrievedContent).to.eq(aliceContent);
 
-    // Verify Alice's diary
-    const [aliceEncryptedHash] = await onChainDiaryContract.getDiaryEntry(signers.alice.address, 0);
-    const aliceDecryptedHash = await fhevm.userDecryptEuint(
-      FhevmType.euint256,
-      aliceEncryptedHash,
+    const aliceDecryptedAuthor = await fhevm.userDecryptEuint(
+      FhevmType.euint160,
+      aliceEncryptedAuthorHandle,
       onChainDiaryContractAddress,
       signers.alice,
     );
-    expect(aliceDecryptedHash).to.eq(aliceHash);
+    expect(aliceDecryptedAuthor).to.eq(BigInt(signers.alice.address));
 
-    // Verify Bob's diary
-    const [bobEncryptedHash] = await onChainDiaryContract.getDiaryEntry(signers.bob.address, 0);
-    const bobDecryptedHash = await fhevm.userDecryptEuint(
-      FhevmType.euint256,
-      bobEncryptedHash,
+    // Verify Bob's entry
+    const [bobRetrievedContent, bobEncryptedAuthorHandle] = await onChainDiaryContract
+      .connect(signers.bob)
+      .getEntry(2);
+    expect(bobRetrievedContent).to.eq(bobContent);
+
+    const bobDecryptedAuthor = await fhevm.userDecryptEuint(
+      FhevmType.euint160,
+      bobEncryptedAuthorHandle,
       onChainDiaryContractAddress,
       signers.bob,
     );
-    expect(bobDecryptedHash).to.eq(bobHash);
+    expect(bobDecryptedAuthor).to.eq(BigInt(signers.bob.address));
   });
 
   it("should revert when trying to access non-existent diary entry", async function () {
-    // Try to access diary entry that doesn't exist
     await expect(
-      onChainDiaryContract.getDiaryEntry(signers.alice.address, 0)
-    ).to.be.revertedWith("Diary entry does not exist");
+      onChainDiaryContract.connect(signers.alice).getEntry(999)
+    ).to.be.revertedWith("Entry does not exist");
 
     await expect(
-      onChainDiaryContract.getLatestDiary(signers.alice.address)
-    ).to.be.revertedWith("No diary entries found");
+      onChainDiaryContract.connect(signers.alice).getEntryContent(999)
+    ).to.be.revertedWith("Entry does not exist");
+
+    await expect(
+      onChainDiaryContract.connect(signers.alice).getEntryAuthor(999)
+    ).to.be.revertedWith("Entry does not exist");
   });
 
-  it("should handle time range queries correctly", async function () {
-    // Save diary entries with some delay
-    const hash1 = BigInt("11111111111111111111111111111111111111111111111111111111111111111111");
-    const encrypted1 = await fhevm
+  it("should revert when unauthorized user tries to access entry", async function () {
+    const content = "Private entry";
+
+    const encryptedAuthor = await fhevm
       .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-      .add256(hash1)
-      .encrypt();
-
-    const tx1 = await onChainDiaryContract
-      .connect(signers.alice)
-      .saveDiary(encrypted1.handles[0], encrypted1.inputProof);
-    const receipt1 = await tx1.wait();
-    const timestamp1 = (await ethers.provider.getBlock(receipt1!.blockNumber))!.timestamp;
-
-    // Add a small delay for different timestamp
-    await new Promise(resolve => setTimeout(resolve, 1000));
-
-    const hash2 = BigInt("22222222222222222222222222222222222222222222222222222222222222222222");
-    const encrypted2 = await fhevm
-      .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
-      .add256(hash2)
+      .addAddress(signers.alice.address)
       .encrypt();
 
     await onChainDiaryContract
       .connect(signers.alice)
-      .saveDiary(encrypted2.handles[0], encrypted2.inputProof);
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
 
-    // Query for entries in a specific time range
-    const [hashes, timestamps, indices] = await onChainDiaryContract.getDiariesInTimeRange(
-      signers.alice.address,
-      timestamp1,
-      timestamp1
-    );
+    // Bob tries to access Alice's entry without permission
+    await expect(
+      onChainDiaryContract.connect(signers.bob).getEntry(1)
+    ).to.be.revertedWith("Access denied");
 
-    // Should only return the first entry
-    expect(hashes.length).to.eq(1);
-    expect(timestamps.length).to.eq(1);
-    expect(indices.length).to.eq(1);
-    expect(indices[0]).to.eq(0);
+    await expect(
+      onChainDiaryContract.connect(signers.bob).getEntryContent(1)
+    ).to.be.revertedWith("Access denied");
 
-    const decryptedHash = await fhevm.userDecryptEuint(
-      FhevmType.euint256,
-      hashes[0],
-      onChainDiaryContractAddress,
-      signers.alice,
-    );
-    expect(decryptedHash).to.eq(hash1);
+    await expect(
+      onChainDiaryContract.connect(signers.bob).getEntryAuthor(1)
+    ).to.be.revertedWith("Access denied");
+  });
+
+  it("should revert when unauthorized user tries to grant/revoke access", async function () {
+    const content = "Protected entry";
+
+    const encryptedAuthor = await fhevm
+      .createEncryptedInput(onChainDiaryContractAddress, signers.alice.address)
+      .addAddress(signers.alice.address)
+      .encrypt();
+
+    await onChainDiaryContract
+      .connect(signers.alice)
+      .addEntry(content, encryptedAuthor.handles[0], encryptedAuthor.inputProof);
+
+    // Bob tries to grant access to himself without permission
+    await expect(
+      onChainDiaryContract.connect(signers.bob).grantAccess(1, signers.bob.address)
+    ).to.be.revertedWith("Only authorized users can grant access");
+
+    // Bob tries to revoke access without permission
+    await expect(
+      onChainDiaryContract.connect(signers.bob).revokeAccess(1, signers.alice.address)
+    ).to.be.revertedWith("Only authorized users can revoke access");
   });
 });
