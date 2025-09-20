@@ -7,7 +7,7 @@ export const DiaryForm: React.FC = () => {
   const [content, setContent] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const { address } = useAccount();
-  const { addEntry, fheLoading, fheError } = useDiaryContract();
+  const { addEntry, fheLoading } = useDiaryContract();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,7 +36,7 @@ export const DiaryForm: React.FC = () => {
     }
   };
 
-  const isButtonDisabled = isLoading || !content.trim() || fheLoading || !!fheError;
+  const isButtonDisabled = isLoading || !content.trim() || fheLoading;
 
   return (
     <div className="diary-form">
@@ -75,12 +75,6 @@ export const DiaryForm: React.FC = () => {
         </div>
       </form>
 
-      {fheError && (
-        <div className="diary-form-error">
-          <h3 className="diary-form-error-title">FHE Error:</h3>
-          <p className="diary-form-error-text">{fheError}</p>
-        </div>
-      )}
 
       
     </div>
