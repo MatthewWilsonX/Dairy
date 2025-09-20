@@ -234,7 +234,7 @@ export const DiaryList: React.FC = () => {
     <div className="diary-list">
       <div className="diary-list-header">
         <h2 className="diary-list-title">
-          My Diary Entries ({userEntryCount})
+          My Diary ({userEntryCount})
         </h2>
         <button
           onClick={refreshEntries}
