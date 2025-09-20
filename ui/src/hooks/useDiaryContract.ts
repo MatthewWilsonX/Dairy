@@ -34,10 +34,17 @@ const hexToArrayBuffer = (hex: string): ArrayBuffer => {
 // Helper function to encrypt string content using a key address
 const encryptString = async (content: string, keyAddress: string): Promise<string> => {
   try {
+    // Ensure keyAddress is in the correct format (normalize)
+    let normalizedKeyAddress = keyAddress;
+    if (typeof keyAddress === 'string' && keyAddress.startsWith('0x')) {
+      normalizedKeyAddress = keyAddress.toLowerCase();
+    }
+    console.log('encryptString: Using normalized keyAddress:', normalizedKeyAddress);
+
     // Create a deterministic key from the address using Web Crypto API
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
-      stringToArrayBuffer(keyAddress),
+      stringToArrayBuffer(normalizedKeyAddress),
       { name: 'PBKDF2' },
       false,
       ['deriveKey']
@@ -78,27 +85,40 @@ const encryptString = async (content: string, keyAddress: string): Promise<strin
 
 // Helper function to decrypt string content using a key address
 const decryptString = async (encryptedContent: string, keyAddress: string): Promise<string> => {
+  console.log('decryptString: Starting decryption with:', { encryptedContent, keyAddress });
+
   try {
     // Check if content is encrypted (contains colon)
     if (!encryptedContent.includes(':')) {
+      console.log('decryptString: Content does not appear to be encrypted (no colon found)');
       return encryptedContent; // Return as-is if not encrypted
     }
 
     const parts = encryptedContent.split(':');
     if (parts.length !== 2) {
+      console.log('decryptString: Invalid encrypted content format');
       return encryptedContent; // Return as-is if format is invalid
     }
 
     const [ivHex, encryptedHex] = parts;
+    console.log('decryptString: Parsed IV and encrypted data lengths:', ivHex.length, encryptedHex.length);
+
+    // Ensure keyAddress is in the correct format (normalize)
+    let normalizedKeyAddress = keyAddress;
+    if (typeof keyAddress === 'string' && keyAddress.startsWith('0x')) {
+      normalizedKeyAddress = keyAddress.toLowerCase();
+    }
+    console.log('decryptString: Normalized keyAddress:', normalizedKeyAddress);
 
     // Create a deterministic key from the address using Web Crypto API
     const keyMaterial = await crypto.subtle.importKey(
       'raw',
-      stringToArrayBuffer(keyAddress),
+      stringToArrayBuffer(normalizedKeyAddress),
       { name: 'PBKDF2' },
       false,
       ['deriveKey']
     );
+    console.log('decryptString: Key material imported successfully');
 
     const key = await crypto.subtle.deriveKey(
       {
@@ -112,10 +132,12 @@ const decryptString = async (encryptedContent: string, keyAddress: string): Prom
       false,
       ['decrypt']
     );
+    console.log('decryptString: Key derived successfully');
 
     // Convert hex back to ArrayBuffers
     const iv = hexToArrayBuffer(ivHex);
     const encryptedData = hexToArrayBuffer(encryptedHex);
+    console.log('decryptString: Converted hex to ArrayBuffers');
 
     // Decrypt the content
     const decrypted = await crypto.subtle.decrypt(
@@ -123,14 +145,16 @@ const decryptString = async (encryptedContent: string, keyAddress: string): Prom
       key,
       encryptedData
     );
+    console.log('decryptString: Decryption successful');
 
     // Convert back to string
     const decoder = new TextDecoder();
-    return decoder.decode(decrypted);
+    const result = decoder.decode(decrypted);
+    console.log('decryptString: Decoded result:', result);
+    return result;
   } catch (error) {
-    console.error('Decryption error:', error);
-    // Fallback: return encrypted content if decryption fails
-    return encryptedContent;
+    console.error('decryptString: Decryption error details:', error);
+    throw new Error(`解密失败: ${(error as Error).message}`);
   }
 };
 
@@ -244,16 +268,11 @@ export const useDiaryContract = () => {
       const contract = await getContract();
       console.log(`useDiaryContract: Got signed contract for entry ${entryId}`);
 
-      // Get the full entry to access encrypted author
-      const entry = await contract.getEntry(entryId);
-      console.log(`useDiaryContract: Got full entry for ${entryId}:`, entry);
+      // Get just the content using the dedicated function
+      const content = await contract.getEntryContent(entryId);
+      console.log(`useDiaryContract: Got content for entry ${entryId}:`, content);
 
-      const encryptedContent = entry.content;
-      console.log(`useDiaryContract: Encrypted content for entry ${entryId}:`, encryptedContent);
-
-      // For now, return the encrypted content as-is
-      // TODO: Implement decryption when we can decrypt the encryptedAuthor to get keyAddress
-      return encryptedContent;
+      return content;
     } catch (error) {
       console.error(`useDiaryContract: Error getting entry content for ID ${entryId}:`, error);
       throw error;
