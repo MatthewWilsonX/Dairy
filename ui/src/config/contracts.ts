@@ -1,5 +1,5 @@
 // OnChainDiary contract deployed on Sepolia
-export const CONTRACT_ADDRESS = '0x27201903Bb09357C633B1f966120A3A03f5aE90E';
+export const CONTRACT_ADDRESS = '0x8B5d32e1F5e0981e0fDF301b212ABFCD71FDB07B';
 
 // Generated ABI from deployment - Auto-synced from deployments/sepolia/OnChainDiary.json
 export const CONTRACT_ABI = [
@@ -104,30 +104,6 @@ export const CONTRACT_ABI = [
     "inputs": [
       {
         "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "",
-        "type": "address"
-      }
-    ],
-    "name": "entryAccess",
-    "outputs": [
-      {
-        "internalType": "bool",
-        "name": "",
-        "type": "bool"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
         "name": "entryId",
         "type": "uint256"
       }
@@ -154,19 +130,36 @@ export const CONTRACT_ABI = [
     "name": "getEntry",
     "outputs": [
       {
-        "internalType": "string",
-        "name": "content",
-        "type": "string"
-      },
-      {
-        "internalType": "eaddress",
-        "name": "encryptedAuthor",
-        "type": "bytes32"
-      },
-      {
-        "internalType": "uint256",
-        "name": "timestamp",
-        "type": "uint256"
+        "components": [
+          {
+            "internalType": "address",
+            "name": "owner",
+            "type": "address"
+          },
+          {
+            "internalType": "string",
+            "name": "content",
+            "type": "string"
+          },
+          {
+            "internalType": "eaddress",
+            "name": "encryptedAuthor",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "uint256",
+            "name": "timestamp",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "exists",
+            "type": "bool"
+          }
+        ],
+        "internalType": "struct OnChainDiary.DiaryEntry",
+        "name": "",
+        "type": "tuple"
       }
     ],
     "stateMutability": "view",
@@ -226,40 +219,60 @@ export const CONTRACT_ABI = [
   {
     "inputs": [
       {
-        "internalType": "uint256",
-        "name": "entryId",
-        "type": "uint256"
-      },
-      {
         "internalType": "address",
         "name": "user",
         "type": "address"
       }
     ],
-    "name": "grantAccess",
-    "outputs": [],
-    "stateMutability": "nonpayable",
+    "name": "getUserEntries",
+    "outputs": [
+      {
+        "internalType": "uint256[]",
+        "name": "entryIds",
+        "type": "uint256[]"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "user",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "index",
+        "type": "uint256"
+      }
+    ],
+    "name": "getUserEntryByIndex",
+    "outputs": [
+      {
         "internalType": "uint256",
         "name": "entryId",
         "type": "uint256"
-      },
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
       {
         "internalType": "address",
         "name": "user",
         "type": "address"
       }
     ],
-    "name": "hasAccess",
+    "name": "getUserEntryCount",
     "outputs": [
       {
-        "internalType": "bool",
-        "name": "userHasAccess",
-        "type": "bool"
+        "internalType": "uint256",
+        "name": "count",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -276,24 +289,6 @@ export const CONTRACT_ABI = [
       }
     ],
     "stateMutability": "pure",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "entryId",
-        "type": "uint256"
-      },
-      {
-        "internalType": "address",
-        "name": "user",
-        "type": "address"
-      }
-    ],
-    "name": "revokeAccess",
-    "outputs": [],
-    "stateMutability": "nonpayable",
     "type": "function"
   }
 ] as const;

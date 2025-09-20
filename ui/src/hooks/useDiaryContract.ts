@@ -9,13 +9,13 @@ export const useDiaryContract = () => {
   const { data: walletClient } = useWalletClient();
   const { instance: fheInstance, isLoading: fheLoading, error: fheError } = useZamaInstance();
 
-  const getContract = () => {
+  const getContract = async () => {
     if (!walletClient) {
       throw new Error('Wallet not connected');
     }
 
     const provider = new ethers.BrowserProvider(walletClient);
-    const signer = provider.getSigner();
+    const signer =await provider.getSigner();
     return new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
   };
 
@@ -52,8 +52,10 @@ export const useDiaryContract = () => {
       const encryptedInput = await input.encrypt();
 
       // Get contract instance
-      const contract = getContract();
-
+      const contract =await getContract();
+      console.log("addEntry:",content,        encryptedInput.handles[0],
+        encryptedInput.inputProof);
+      
       // Call addEntry function
       const tx = await contract.addEntry(
         content,
