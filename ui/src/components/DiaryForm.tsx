@@ -82,13 +82,7 @@ export const DiaryForm: React.FC = () => {
         </div>
       )}
 
-      <div className="diary-form-note">
-        <h3 className="diary-form-note-title">Privacy Note:</h3>
-        <p className="diary-form-note-text">
-          Your diary content will be stored as plaintext on the blockchain, but your author address
-          will be encrypted using Zama FHE technology for privacy protection.
-        </p>
-      </div>
+      
     </div>
   );
 };
