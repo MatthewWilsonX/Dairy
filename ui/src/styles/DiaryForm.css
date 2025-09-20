@@ -1,0 +1,129 @@
+/* Diary Form Styles */
+.diary-form {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+}
+
+.diary-form-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 1rem;
+}
+
+.diary-form-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.diary-form-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.diary-form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.diary-form-textarea {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  resize: vertical;
+  font-family: inherit;
+}
+
+.diary-form-textarea:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.diary-form-textarea:disabled {
+  background-color: #f3f4f6;
+  cursor: not-allowed;
+}
+
+.diary-form-submit {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.diary-form-button {
+  padding: 0.5rem 1.5rem;
+  border-radius: 0.375rem;
+  color: white;
+  font-weight: 500;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.diary-form-button-active {
+  background-color: #2563eb;
+}
+
+.diary-form-button-active:hover {
+  background-color: #1d4ed8;
+}
+
+.diary-form-button-active:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: #3b82f6;
+  ring-offset: 2px;
+}
+
+.diary-form-button-disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.diary-form-error {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #fef2f2;
+  border-radius: 0.375rem;
+  border: 1px solid #fecaca;
+}
+
+.diary-form-error-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #991b1b;
+  margin-bottom: 0.5rem;
+}
+
+.diary-form-error-text {
+  font-size: 0.875rem;
+  color: #b91c1c;
+}
+
+.diary-form-note {
+  margin-top: 1rem;
+  padding: 1rem;
+  background-color: #eff6ff;
+  border-radius: 0.375rem;
+}
+
+.diary-form-note-title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #1e40af;
+  margin-bottom: 0.5rem;
+}
+
+.diary-form-note-text {
+  font-size: 0.875rem;
+  color: #1e3a8a;
+}

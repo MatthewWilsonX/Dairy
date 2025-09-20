@@ -1,13 +1,13 @@
 import { ethers } from 'ethers';
 import { useAccount, usePublicClient, useWalletClient } from 'wagmi';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from '../config/contracts';
-import { useFHE } from './useFHE';
+import { useZamaInstance } from './useZamaInstance';
 
 export const useDiaryContract = () => {
   const { address } = useAccount();
   const publicClient = usePublicClient();
   const { data: walletClient } = useWalletClient();
-  const { instance: fheInstance, isLoading: fheLoading, error: fheError } = useFHE();
+  const { instance: fheInstance, isLoading: fheLoading, error: fheError } = useZamaInstance();
 
   const getContract = () => {
     if (!walletClient) {

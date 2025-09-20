@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAccount } from 'wagmi';
 import { useDiaryContract } from '../hooks/useDiaryContract';
+import '../styles/DiaryList.css';
 
 interface DiaryEntry {
   id: number;
@@ -88,60 +89,60 @@ export const DiaryList: React.FC = () => {
   }
 
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-semibold text-gray-800">
+    <div className="diary-list">
+      <div className="diary-list-header">
+        <h2 className="diary-list-title">
           My Diary Entries ({totalEntries})
         </h2>
         <button
           onClick={refreshEntries}
           disabled={isLoading}
-          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:bg-gray-400 transition-colors"
+          className="diary-list-refresh"
         >
           {isLoading ? 'Loading...' : 'Refresh'}
         </button>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-2">Loading your diary entries...</p>
+        <div className="diary-list-loading">
+          <div className="diary-list-spinner"></div>
+          <p className="diary-list-loading-text">Loading your diary entries...</p>
         </div>
       ) : entries.length === 0 ? (
-        <div className="text-center py-8">
-          <p className="text-gray-600">No diary entries found. Create your first entry above!</p>
+        <div className="diary-list-empty">
+          <p className="diary-list-empty-text">No diary entries found. Create your first entry above!</p>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="diary-list-entries">
           {entries.map((entry) => (
             <div
               key={entry.id}
-              className={`border rounded-lg p-4 ${
+              className={`diary-entry ${
                 entry.hasAccess
-                  ? 'border-gray-200 bg-gray-50'
-                  : 'border-red-200 bg-red-50'
+                  ? 'diary-entry-accessible'
+                  : 'diary-entry-restricted'
               }`}
             >
-              <div className="flex justify-between items-start mb-2">
-                <span className="text-sm font-medium text-gray-600">
+              <div className="diary-entry-header">
+                <span className="diary-entry-id">
                   Entry #{entry.id}
                 </span>
                 {entry.hasAccess && entry.timestamp > 0 && (
-                  <span className="text-sm text-gray-500">
+                  <span className="diary-entry-timestamp">
                     {formatDate(entry.timestamp)}
                   </span>
                 )}
               </div>
 
-              <div className="text-gray-800">
+              <div className="diary-entry-content">
                 {entry.hasAccess ? (
-                  <p className="whitespace-pre-wrap">{entry.content}</p>
+                  <p className="diary-entry-text">{entry.content}</p>
                 ) : (
-                  <div className="flex items-center text-red-600">
-                    <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <div className="diary-entry-restricted-content">
+                    <svg className="diary-entry-lock-icon" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
                     </svg>
-                    <span className="italic">{entry.content}</span>
+                    <span className="diary-entry-restricted-text">{entry.content}</span>
                   </div>
                 )}
               </div>

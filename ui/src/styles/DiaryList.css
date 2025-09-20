@@ -1,0 +1,144 @@
+/* Diary List Styles */
+.diary-list {
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
+  padding: 1.5rem;
+}
+
+.diary-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.diary-list-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.diary-list-refresh {
+  padding: 0.5rem 1rem;
+  background-color: #2563eb;
+  color: white;
+  border-radius: 0.375rem;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.diary-list-refresh:hover {
+  background-color: #1d4ed8;
+}
+
+.diary-list-refresh:focus {
+  outline: none;
+  ring: 2px;
+  ring-color: #3b82f6;
+  ring-offset: 2px;
+}
+
+.diary-list-refresh:disabled {
+  background-color: #9ca3af;
+  cursor: not-allowed;
+}
+
+.diary-list-loading {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.diary-list-spinner {
+  width: 2rem;
+  height: 2rem;
+  border: 2px solid #e5e7eb;
+  border-top: 2px solid #2563eb;
+  border-radius: 50%;
+  margin: 0 auto;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.diary-list-loading-text {
+  color: #6b7280;
+  margin-top: 0.5rem;
+}
+
+.diary-list-empty {
+  text-align: center;
+  padding: 2rem 0;
+}
+
+.diary-list-empty-text {
+  color: #6b7280;
+}
+
+.diary-list-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.diary-entry {
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+
+.diary-entry-accessible {
+  border-color: #e5e7eb;
+  background-color: #f9fafb;
+}
+
+.diary-entry-restricted {
+  border-color: #fecaca;
+  background-color: #fef2f2;
+}
+
+.diary-entry-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 0.5rem;
+}
+
+.diary-entry-id {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.diary-entry-timestamp {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+.diary-entry-content {
+  color: #1f2937;
+}
+
+.diary-entry-text {
+  white-space: pre-wrap;
+}
+
+.diary-entry-restricted-content {
+  display: flex;
+  align-items: center;
+  color: #dc2626;
+}
+
+.diary-entry-lock-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.5rem;
+}
+
+.diary-entry-restricted-text {
+  font-style: italic;
+}

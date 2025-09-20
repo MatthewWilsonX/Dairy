@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAccount } from 'wagmi';
 import { useDiaryContract } from '../hooks/useDiaryContract';
+import '../styles/DiaryForm.css';
 
 export const DiaryForm: React.FC = () => {
   const [content, setContent] = useState('');
@@ -35,21 +36,23 @@ export const DiaryForm: React.FC = () => {
     }
   };
 
+  const isButtonDisabled = isLoading || !content.trim() || fheLoading || !!fheError;
+
   return (
-    <div className="bg-white rounded-lg shadow-md p-6">
-      <h2 className="text-2xl font-semibold text-gray-800 mb-4">
+    <div className="diary-form">
+      <h2 className="diary-form-title">
         Add New Diary Entry
       </h2>
 
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div>
-          <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-2">
+      <form onSubmit={handleSubmit} className="diary-form-form">
+        <div className="diary-form-group">
+          <label htmlFor="content" className="diary-form-label">
             Diary Content
           </label>
           <textarea
             id="content"
             rows={6}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+            className="diary-form-textarea"
             placeholder="Write your diary entry here..."
             value={content}
             onChange={(e) => setContent(e.target.value)}
@@ -57,15 +60,15 @@ export const DiaryForm: React.FC = () => {
           />
         </div>
 
-        <div className="flex justify-end">
+        <div className="diary-form-submit">
           <button
             type="submit"
-            disabled={isLoading || !content.trim() || fheLoading || !!fheError}
-            className={`px-6 py-2 rounded-md text-white font-medium ${
-              isLoading || !content.trim() || fheLoading || !!fheError
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2'
-            } transition-colors`}
+            disabled={isButtonDisabled}
+            className={`diary-form-button ${
+              isButtonDisabled
+                ? 'diary-form-button-disabled'
+                : 'diary-form-button-active'
+            }`}
           >
             {fheLoading ? 'Initializing FHE...' : isLoading ? 'Adding Entry...' : 'Add Entry'}
           </button>
@@ -73,15 +76,15 @@ export const DiaryForm: React.FC = () => {
       </form>
 
       {fheError && (
-        <div className="mt-4 p-4 bg-red-50 rounded-md border border-red-200">
-          <h3 className="text-sm font-medium text-red-800 mb-2">FHE Error:</h3>
-          <p className="text-sm text-red-700">{fheError}</p>
+        <div className="diary-form-error">
+          <h3 className="diary-form-error-title">FHE Error:</h3>
+          <p className="diary-form-error-text">{fheError}</p>
         </div>
       )}
 
-      <div className="mt-4 p-4 bg-blue-50 rounded-md">
-        <h3 className="text-sm font-medium text-blue-800 mb-2">Privacy Note:</h3>
-        <p className="text-sm text-blue-700">
+      <div className="diary-form-note">
+        <h3 className="diary-form-note-title">Privacy Note:</h3>
+        <p className="diary-form-note-text">
           Your diary content will be stored as plaintext on the blockchain, but your author address
           will be encrypted using Zama FHE technology for privacy protection.
         </p>
