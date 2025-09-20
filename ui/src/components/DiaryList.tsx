@@ -280,14 +280,14 @@ export const DiaryList: React.FC = () => {
                       className="diary-entry-decrypt-btn"
                       onClick={() => decryptEntry(entry.id)}
                       disabled={decryptingEntries.has(entry.id) || fheLoading}
-                      title="解密此日记内容"
+                      title="Decrypt..."
                     >
-                      {decryptingEntries.has(entry.id) ? '🔄 解密中...' : '🔓 解密'}
+                      {decryptingEntries.has(entry.id) ? '🔄 Decrypt...' : '🔓 Decrypt'}
                     </button>
                   )}
                   {entry.isDecrypted && (
                     <span className="diary-entry-decrypted-badge">
-                      ✅ 已解密
+                      ✅ Decrypted
                     </span>
                   )}
                 </div>
