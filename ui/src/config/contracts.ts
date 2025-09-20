@@ -1,5 +1,5 @@
 // OnChainDiary contract deployed on Sepolia
-export const CONTRACT_ADDRESS = '0x5FbDB2315678afecb367f032d93F642f64180aa3'; // Update with actual Sepolia deployment
+export const CONTRACT_ADDRESS = '0x27201903Bb09357C633B1f966120A3A03f5aE90E';
 
 // Generated ABI for OnChainDiary contract
 export const CONTRACT_ABI = [
